@@ -1435,3 +1435,6 @@ body {
   .alerts-layout { grid-template-columns: 1fr; }
   .sensor-gauges-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Real Camera Feed Overrides */
+.real-camera-feed { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 6px; z-index: 5; opacity: 0.85; mix-blend-mode: lighten; }

@@ -171,32 +171,23 @@ class CameraDetector:
         if self.cap and self.cap.isOpened():
             self.cap.release()
 
-    def process_frame(self):
+    def process_frame(self, draw=True):
         """
         Capture and process a single camera frame.
 
         Returns:
-            dict with detection results:
-                {
-                    "face_detected": True,
-                    "face_confidence": 0.99,
-                    "eye_aspect_ratio": 0.82,
-                    "left_ear": 0.83,
-                    "right_ear": 0.81,
-                    "head_yaw": 2.1,
-                    "head_pitch": -1.3,
-                    "is_drowsy": False,
-                    "drowsy_frames": 0,
-                    "phone_detected": False,
-                    "fps": 30,
-                }
+            result (dict): Detection results
+            frame (np.ndarray): The BGR frame, optionally with drawn landmarks
         """
         if not self.active or not self.cap or not self.cap.isOpened():
-            return self._default_result()
+            return self._default_result(), None
 
         ret, frame = self.cap.read()
         if not ret:
-            return self._default_result()
+            return self._default_result(), None
+        
+        # Mirror the frame horizontally for selfie-view display
+        frame = cv2.flip(frame, 1)
 
         # Convert to RGB for MediaPipe
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -206,6 +197,22 @@ class CameraDetector:
 
         if results.multi_face_landmarks:
             landmarks = results.multi_face_landmarks[0].landmark
+
+            if draw:
+                mp_drawing = mp.solutions.drawing_utils
+                mp_drawing_styles = mp.solutions.drawing_styles
+                mp_drawing.draw_landmarks(
+                    image=frame,
+                    landmark_list=results.multi_face_landmarks[0],
+                    connections=mp.solutions.face_mesh.FACEMESH_TESSELATION,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style())
+                mp_drawing.draw_landmarks(
+                    image=frame,
+                    landmark_list=results.multi_face_landmarks[0],
+                    connections=mp.solutions.face_mesh.FACEMESH_CONTOURS,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_contours_style())
 
             result["face_detected"] = True
             result["face_confidence"] = 0.95  # MediaPipe doesn't expose this directly
@@ -251,7 +258,7 @@ class CameraDetector:
             if nose.x < 0.2 or nose.x > 0.8:
                 result["phone_detected"] = True
 
-        return result
+        return result, frame
 
     def _default_result(self):
         """Default result when no face is detected."""

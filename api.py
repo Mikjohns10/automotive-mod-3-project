@@ -15,7 +15,11 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 
 import config
-from inference import DriverBehaviorClassifier
+from camera_detector import CameraDetector
+import cv2
+
+# Global variable to store the latest encoded JPEG frame for the video stream
+global_frame_bytes = b""
 
 # ── App Setup ─────────────────────────────────────────────────
 app = Flask(__name__, static_folder=".", static_url_path="")
@@ -26,16 +30,16 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode=config.SOCKETIO_AS
 classifier = DriverBehaviorClassifier()
 
 # ── Simulation Thread ─────────────────────────────────────────
-# Generates simulated sensor data when no real sensors are connected.
+# Uses real camera data if available, combined with simulated vehicle dynamics
 simulation_active = True
-simulation_interval = 0.3  # seconds
-
+simulation_interval = 0.1  # 10 FPS
 
 def simulate_driving():
-    """Background thread that simulates driving sensor data."""
+    """Background thread that captures real video and simulates vehicle data."""
+    global global_frame_bytes
     np.random.seed(int(time.time()) % 10000)
 
-    # State variables with smooth transitions
+    # State variables with smooth transitions (for simulated vehicle dynamics)
     speed     = 65.0
     accel     = 0.5
     braking   = 0.2
@@ -45,37 +49,52 @@ def simulate_driving():
     head_yaw  = 0.0
     phone     = 0.0
 
+    # Initialize camera detector
+    cam = CameraDetector()
+    if cam.start():
+        print("✓ Real-time camera feed active")
+    else:
+        print("⚠ Camera not found, falling back to pure simulation")
+
     tick = 0
 
     while simulation_active:
         tick += 1
 
-        # Smooth random walk
+        # Smooth random walk for vehicle dynamics
         speed    = np.clip(speed    + np.random.normal(0, 2.0),   0, 145)
         accel    = np.clip(accel    + np.random.normal(0, 0.15),  0, 8)
         braking  = np.clip(braking  + np.random.normal(0, 0.1),   0, 7)
         steering = np.clip(steering + np.random.normal(0, 1.0),  -40, 40)
         lane_dev = np.clip(lane_dev + np.random.normal(0, 0.02),   0, 0.8)
-        ear      = np.clip(ear      + np.random.normal(0, 0.015),  0.12, 1.0)
-        head_yaw = np.clip(head_yaw + np.random.normal(0, 0.6),  -40, 40)
+        
+        # Read real camera frame
+        cam_data, frame = cam.process_frame(draw=True)
+        
+        if frame is not None:
+            # Encode frame to JPEG for the web stream
+            ret, buffer = cv2.imencode('.jpg', frame)
+            if ret:
+                global_frame_bytes = buffer.tobytes()
 
-        # Occasional events (every ~40 ticks on average)
-        if np.random.random() < 0.025:
-            event = np.random.choice(["drowsy", "phone", "brake", "accel", "lane"])
-            if event == "drowsy":
-                ear = np.random.uniform(0.12, 0.22)
-            elif event == "phone":
-                phone = 1.0
-            elif event == "brake":
-                braking = np.random.uniform(4.5, 7)
-            elif event == "accel":
-                accel = np.random.uniform(5, 8)
-            elif event == "lane":
-                lane_dev = np.random.uniform(0.35, 0.6)
-
-        # Reset phone after some ticks
-        if phone > 0 and np.random.random() < 0.15:
-            phone = 0.0
+        # If a real face is detected, override the simulated face values
+        if cam_data and cam_data.get("face_detected"):
+            ear = cam_data.get("eye_aspect_ratio", ear)
+            head_yaw = cam_data.get("head_yaw", head_yaw)
+            phone = 1.0 if cam_data.get("phone_detected") else 0.0
+        else:
+            # Pure simulation fallback for face params if no face is detected
+            ear      = np.clip(ear      + np.random.normal(0, 0.015),  0.12, 1.0)
+            head_yaw = np.clip(head_yaw + np.random.normal(0, 0.6),  -40, 40)
+            if phone > 0 and np.random.random() < 0.15:
+                phone = 0.0
+            if np.random.random() < 0.025:
+                event = np.random.choice(["drowsy", "phone", "brake", "accel", "lane"])
+                if event == "drowsy": ear = np.random.uniform(0.12, 0.22)
+                elif event == "phone": phone = 1.0
+                elif event == "brake": braking = np.random.uniform(4.5, 7)
+                elif event == "accel": accel = np.random.uniform(5, 8)
+                elif event == "lane": lane_dev = np.random.uniform(0.35, 0.6)
 
         # Build sensor frame
         sensor_data = {
@@ -91,6 +110,9 @@ def simulate_driving():
 
         # Run through classifier
         result = classifier.process_frame(sensor_data)
+
+        # Add camera status flag for frontend rendering
+        result["camera_active"] = (frame is not None)
 
         # Broadcast via WebSocket
         socketio.emit("sensor_update", result)
@@ -112,6 +134,22 @@ def serve_static(filename):
 
 
 # ── REST API Endpoints ────────────────────────────────────────
+
+def generate_video_stream():
+    """Generator for MJPEG video streaming."""
+    global global_frame_bytes
+    while True:
+        if global_frame_bytes:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + global_frame_bytes + b'\r\n')
+        time.sleep(0.033)  # ~30 FPS stream
+
+@app.route("/video_feed")
+def video_feed():
+    """Video streaming route. Put this in the src attribute of an img tag."""
+    from flask import Response
+    return Response(generate_video_stream(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route("/api/status")
 def api_status():

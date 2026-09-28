@@ -114,6 +114,7 @@ function updateServerStatus(connected) {
   const indicator = $('server-indicator');
   const dot = $('server-dot');
   const label = $('server-label');
+
   if (connected) {
     indicator.classList.add('connected');
     dot.classList.remove('disconnected');
@@ -124,6 +125,12 @@ function updateServerStatus(connected) {
     dot.classList.add('disconnected');
     dot.classList.remove('connected');
     label.textContent = 'STANDALONE';
+    
+    // When disconnected, always fallback to SVG simulation
+    const realCam = $('real-camera-feed');
+    const svgOverlay = $('face-overlay');
+    if (realCam) realCam.style.display = 'none';
+    if (svgOverlay) svgOverlay.style.display = 'block';
   }
 }
 
@@ -138,6 +145,17 @@ function applyServerPrediction(data) {
   state.ear       = params.eye_aspect_ratio || state.ear;
   state.headYaw   = params.head_yaw || state.headYaw;
   state.phoneDetected = (params.phone_usage || 0) > 0.5;
+
+  // Render compatibility: only show MJPEG feed if backend confirms camera is active
+  const realCam = $('real-camera-feed');
+  const svgOverlay = $('face-overlay');
+  if (data.camera_active) {
+    if (realCam) realCam.style.display = 'block';
+    if (svgOverlay) svgOverlay.style.display = 'none';
+  } else {
+    if (realCam) realCam.style.display = 'none';
+    if (svgOverlay) svgOverlay.style.display = 'block';
+  }
 
   state.riskScore = data.risk_score || state.riskScore;
 

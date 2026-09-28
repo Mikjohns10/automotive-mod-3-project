@@ -391,29 +391,21 @@
             <div class="camera-corner bl"></div>
             <div class="camera-corner br"></div>
 
-            <!-- Face tracking overlay SVG -->
+            <!-- Live Camera Feed (MJPEG Stream from Backend) -->
+            <img class="real-camera-feed" id="real-camera-feed" src="/video_feed" alt="Camera Feed" style="display: none;" />
+
+            <!-- Fallback SVG (used in standalone mode) -->
             <svg class="face-overlay" id="face-overlay" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
-              <!-- Face bounding box -->
               <rect id="face-box" x="130" y="50" width="140" height="180" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="8 4" rx="4"/>
-              <!-- Eye tracking boxes -->
               <rect id="left-eye-box" x="148" y="100" width="38" height="22" fill="none" stroke="#00ff88" stroke-width="1.2" rx="3"/>
               <rect id="right-eye-box" x="214" y="100" width="38" height="22" fill="none" stroke="#00ff88" stroke-width="1.2" rx="3"/>
-              <!-- Pupil centers -->
               <circle id="left-pupil" cx="167" cy="111" r="4" fill="none" stroke="#00ff88" stroke-width="1.2"/>
               <circle id="right-pupil" cx="233" cy="111" r="4" fill="none" stroke="#00ff88" stroke-width="1.2"/>
-              <!-- Nose point -->
               <circle cx="200" cy="155" r="2.5" fill="#f59e0b"/>
-              <!-- Mouth line -->
               <path d="M175 175 Q200 185 225 175" fill="none" stroke="#f59e0b" stroke-width="1.2"/>
-              <!-- Head pose axes -->
               <line id="pose-yaw" x1="200" y1="140" x2="230" y2="140" stroke="#ff6b6b" stroke-width="2" stroke-linecap="round"/>
               <line id="pose-pitch" x1="200" y1="140" x2="200" y2="110" stroke="#00d4ff" stroke-width="2" stroke-linecap="round"/>
-              <!-- Labels -->
               <text x="135" y="47" fill="#00d4ff" font-size="9" font-family="JetBrains Mono">FACE DETECTED</text>
-              <text x="148" y="96" fill="#00ff88" font-size="8" font-family="JetBrains Mono">LEFT EYE</text>
-              <text x="214" y="96" fill="#00ff88" font-size="8" font-family="JetBrains Mono">RIGHT EYE</text>
-              <text x="232" y="138" fill="#ff6b6b" font-size="8" font-family="JetBrains Mono">YAW</text>
-              <text x="203" y="108" fill="#00d4ff" font-size="8" font-family="JetBrains Mono">PITCH</text>
             </svg>
 
             <!-- Camera UI overlays -->
