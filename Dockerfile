@@ -27,4 +27,4 @@ ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 
 # Use PORT env var from Render (defaults to 5000 locally)
-CMD gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:${PORT:-5000} api:app
+CMD gunicorn --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 --bind 0.0.0.0:${PORT:-5000} api:app

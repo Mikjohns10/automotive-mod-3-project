@@ -104,7 +104,12 @@ PARAM_RISK_RULES = {
 API_HOST = "0.0.0.0"
 API_PORT = 5000
 CORS_ORIGINS = "*"
-SOCKETIO_ASYNC_MODE = "threading"
+# Auto-detect async mode: use gevent in production (Docker/Render), threading locally
+try:
+    import gevent          # noqa: F401
+    SOCKETIO_ASYNC_MODE = "gevent"
+except ImportError:
+    SOCKETIO_ASYNC_MODE = "threading"
 
 # ── Alert Thresholds (defaults) ───────────────────────────────
 DEFAULT_THRESHOLDS = {
