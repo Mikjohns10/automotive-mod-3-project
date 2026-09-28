@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AI-Based Driver Behaviour, Fatigue and Risk Detection System — real-time monitoring using CNN/LSTM for drowsiness, distraction and unsafe driving detection." />
+  <title>DriveGuard AI — Driver Behaviour & Risk Detection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+
+  <!-- Animated background particles -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="18" stroke="url(#lg1)" stroke-width="2"/>
+          <path d="M12 20 Q20 10 28 20 Q20 30 12 20Z" fill="url(#lg2)" opacity="0.8"/>
+          <circle cx="20" cy="20" r="4" fill="#00d4ff"/>
+          <defs>
+            <linearGradient id="lg1" x1="0" y1="0" x2="40" y2="40">
+              <stop offset="0%" stop-color="#00d4ff"/>
+              <stop offset="100%" stop-color="#7c3aed"/>
+            </linearGradient>
+            <linearGradient id="lg2" x1="0" y1="0" x2="40" y2="40">
+              <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.6"/>
+              <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.6"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <span class="logo-text">DriveGuard<span class="logo-ai">AI</span></span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-section="dashboard" id="nav-dashboard">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/></svg>
+        Dashboard
+      </a>
+      <a href="#" class="nav-item" data-section="camera" id="nav-camera">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M23 7l-7 5 7 5V7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><rect x="1" y="5" width="15" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/></svg>
+        Driver Camera
+      </a>
+      <a href="#" class="nav-item" data-section="sensors" id="nav-sensors">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Sensors
+      </a>
+      <a href="#" class="nav-item" data-section="history" id="nav-history">
+        <svg viewBox="0 0 24 24" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        History
+      </a>
+      <a href="#" class="nav-item" data-section="model" id="nav-model">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="4" cy="6" r="2" stroke="currentColor" stroke-width="1.8"/><circle cx="20" cy="6" r="2" stroke="currentColor" stroke-width="1.8"/><circle cx="4" cy="18" r="2" stroke="currentColor" stroke-width="1.8"/><circle cx="20" cy="18" r="2" stroke="currentColor" stroke-width="1.8"/><line x1="6" y1="7" x2="10" y2="11" stroke="currentColor" stroke-width="1.5"/><line x1="18" y1="7" x2="14" y2="11" stroke="currentColor" stroke-width="1.5"/><line x1="6" y1="17" x2="10" y2="13" stroke="currentColor" stroke-width="1.5"/><line x1="18" y1="17" x2="14" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>
+        AI Model
+      </a>
+      <a href="#" class="nav-item" data-section="alerts" id="nav-alerts">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Alerts
+        <span class="nav-badge" id="alert-badge">3</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="session-info">
+        <div class="session-dot"></div>
+        <span>Session Active</span>
+      </div>
+      <div class="session-time" id="session-time">00:00:00</div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- Top Header Bar -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="breadcrumb">
+          <span class="breadcrumb-root">DriveGuard AI</span>
+          <svg viewBox="0 0 24 24" width="14" height="14"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+          <span class="breadcrumb-current" id="breadcrumb-label">Dashboard</span>
+        </div>
+      </div>
+      <div class="top-bar-center">
+        <div class="live-indicator">
+          <span class="live-dot"></span>
+          <span>LIVE MONITORING</span>
+        </div>
+        <div class="server-indicator" id="server-indicator" title="Backend connection status">
+          <span class="server-dot disconnected" id="server-dot"></span>
+          <span id="server-label">STANDALONE</span>
+        </div>
+      </div>
+      <div class="top-bar-right">
+        <div class="time-display" id="current-time"></div>
+        <div class="driver-avatar">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+    </header>
+
+    <!-- ==================== DASHBOARD SECTION ==================== -->
+    <section class="section active" id="section-dashboard">
+
+      <!-- Risk Score Hero -->
+      <div class="risk-hero">
+        <div class="risk-score-container">
+          <div class="risk-label-top">OVERALL RISK SCORE</div>
+          <div class="risk-gauge-wrapper">
+            <canvas id="risk-gauge" width="240" height="140"></canvas>
+            <div class="risk-score-display">
+              <span class="risk-number" id="risk-number">28</span>
+              <span class="risk-unit">/100</span>
+            </div>
+          </div>
+          <div class="risk-status-badge" id="risk-status-badge">
+            <span class="risk-status-dot"></span>
+            <span id="risk-status-text">LOW RISK</span>
+          </div>
+        </div>
+
+        <div class="behavior-classification">
+          <div class="behavior-header">
+            <span>CURRENT CLASSIFICATION</span>
+            <span class="model-tag">CNN/LSTM</span>
+          </div>
+          <div class="behavior-classes" id="behavior-classes">
+            <div class="behavior-class active-class" data-class="normal">
+              <div class="class-indicator"></div>
+              <div class="class-info">
+                <span class="class-name">Normal Driving</span>
+                <span class="class-conf" id="conf-normal">94.2%</span>
+              </div>
+              <div class="class-bar-wrap">
+                <div class="class-bar" style="width:94.2%"></div>
+              </div>
+            </div>
+            <div class="behavior-class" data-class="aggressive">
+              <div class="class-indicator"></div>
+              <div class="class-info">
+                <span class="class-name">Aggressive</span>
+                <span class="class-conf" id="conf-aggressive">2.1%</span>
+              </div>
+              <div class="class-bar-wrap">
+                <div class="class-bar" style="width:2.1%"></div>
+              </div>
+            </div>
+            <div class="behavior-class" data-class="distracted">
+              <div class="class-indicator"></div>
+              <div class="class-info">
+                <span class="class-name">Distracted</span>
+                <span class="class-conf" id="conf-distracted">1.8%</span>
+              </div>
+              <div class="class-bar-wrap">
+                <div class="class-bar" style="width:1.8%"></div>
+              </div>
+            </div>
+            <div class="behavior-class" data-class="drowsy">
+              <div class="class-indicator"></div>
+              <div class="class-info">
+                <span class="class-name">Drowsy</span>
+                <span class="class-conf" id="conf-drowsy">0.9%</span>
+              </div>
+              <div class="class-bar-wrap">
+                <div class="class-bar" style="width:0.9%"></div>
+              </div>
+            </div>
+            <div class="behavior-class" data-class="unsafe-braking">
+              <div class="class-indicator"></div>
+              <div class="class-info">
+                <span class="class-name">Unsafe Braking</span>
+                <span class="class-conf" id="conf-braking">0.6%</span>
+              </div>
+              <div class="class-bar-wrap">
+                <div class="class-bar" style="width:0.6%"></div>
+              </div>
+            </div>
+            <div class="behavior-class" data-class="unsafe-accel">
+              <div class="class-indicator"></div>
+              <div class="class-info">
+                <span class="class-name">Unsafe Accel.</span>
+                <span class="class-conf" id="conf-accel">0.4%</span>
+              </div>
+              <div class="class-bar-wrap">
+                <div class="class-bar" style="width:0.4%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quick-stats">
+          <div class="quick-stat-card" id="stat-speed">
+            <div class="qs-icon speed-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L12 6M12 18L12 22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12L6 12M18 12L22 12M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="qs-data">
+              <span class="qs-value" id="qs-speed">72</span>
+              <span class="qs-unit">km/h</span>
+            </div>
+            <span class="qs-label">Speed</span>
+          </div>
+          <div class="quick-stat-card" id="stat-accel">
+            <div class="qs-icon accel-icon">
+              <svg viewBox="0 0 24 24" fill="none"><polyline points="13 17 18 12 13 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="6 17 11 12 6 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="qs-data">
+              <span class="qs-value" id="qs-accel">0.8</span>
+              <span class="qs-unit">m/s²</span>
+            </div>
+            <span class="qs-label">Acceleration</span>
+          </div>
+          <div class="quick-stat-card" id="stat-eye">
+            <div class="qs-icon eye-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg>
+            </div>
+            <div class="qs-data">
+              <span class="qs-value" id="qs-eye">0.82</span>
+              <span class="qs-unit">EAR</span>
+            </div>
+            <span class="qs-label">Eye Closure</span>
+          </div>
+          <div class="quick-stat-card" id="stat-lane">
+            <div class="qs-icon lane-icon">
+              <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="2" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-dasharray="4 2"/><path d="M5 8l7-6 7 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="qs-data">
+              <span class="qs-value" id="qs-lane">0.12</span>
+              <span class="qs-unit">m</span>
+            </div>
+            <span class="qs-label">Lane Dev.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <div class="chart-card large">
+          <div class="chart-card-header">
+            <div>
+              <h3>Sensor Telemetry</h3>
+              <p>Real-time vehicle & driver data stream</p>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot" style="background:#00d4ff"></span>Speed</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#a855f7"></span>Accel.</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Braking</span>
+            </div>
+          </div>
+          <canvas id="telemetry-chart" width="600" height="200"></canvas>
+        </div>
+
+        <div class="chart-card medium">
+          <div class="chart-card-header">
+            <div>
+              <h3>Behavior Timeline</h3>
+              <p>Last 60 seconds</p>
+            </div>
+          </div>
+          <div class="behavior-timeline" id="behavior-timeline"></div>
+        </div>
+      </div>
+
+      <!-- Parameter Grid -->
+      <div class="params-grid">
+        <div class="params-header">
+          <h3>Live Parameter Monitor</h3>
+          <span class="update-tag">Updates every 100ms</span>
+        </div>
+        <div class="params-cards">
+          <div class="param-card" id="param-speed">
+            <div class="param-icon">🚗</div>
+            <div class="param-details">
+              <span class="param-name">Speed</span>
+              <span class="param-value" id="pv-speed">72 km/h</span>
+            </div>
+            <div class="param-sparkline-wrap">
+              <canvas class="param-sparkline" id="spark-speed" width="80" height="30"></canvas>
+            </div>
+            <div class="param-status ok">OK</div>
+          </div>
+          <div class="param-card" id="param-accel">
+            <div class="param-icon">⚡</div>
+            <div class="param-details">
+              <span class="param-name">Acceleration</span>
+              <span class="param-value" id="pv-accel">0.8 m/s²</span>
+            </div>
+            <div class="param-sparkline-wrap">
+              <canvas class="param-sparkline" id="spark-accel" width="80" height="30"></canvas>
+            </div>
+            <div class="param-status ok">OK</div>
+          </div>
+          <div class="param-card" id="param-braking">
+            <div class="param-icon">🛑</div>
+            <div class="param-details">
+              <span class="param-name">Braking</span>
+              <span class="param-value" id="pv-braking">0.2 m/s²</span>
+            </div>
+            <div class="param-sparkline-wrap">
+              <canvas class="param-sparkline" id="spark-braking" width="80" height="30"></canvas>
+            </div>
+            <div class="param-status ok">OK</div>
+          </div>
+          <div class="param-card" id="param-steering">
+            <div class="param-icon">🎯</div>
+            <div class="param-details">
+              <span class="param-name">Steering</span>
+              <span class="param-value" id="pv-steering">8°</span>
+            </div>
+            <div class="param-sparkline-wrap">
+              <canvas class="param-sparkline" id="spark-steering" width="80" height="30"></canvas>
+            </div>
+            <div class="param-status ok">OK</div>
+          </div>
+          <div class="param-card" id="param-lane">
+            <div class="param-icon">🛣️</div>
+            <div class="param-details">
+              <span class="param-name">Lane Deviation</span>
+              <span class="param-value" id="pv-lane">0.12 m</span>
+            </div>
+            <div class="param-sparkline-wrap">
+              <canvas class="param-sparkline" id="spark-lane" width="80" height="30"></canvas>
+            </div>
+            <div class="param-status ok">OK</div>
+          </div>
+          <div class="param-card" id="param-eye">
+            <div class="param-icon">👁️</div>
+            <div class="param-details">
+              <span class="param-name">Eye Closure (EAR)</span>
+              <span class="param-value" id="pv-eye">0.82</span>
+            </div>
+            <div class="param-sparkline-wrap">
+              <canvas class="param-sparkline" id="spark-eye" width="80" height="30"></canvas>
+            </div>
+            <div class="param-status ok">OK</div>
+          </div>
+          <div class="param-card" id="param-head">
+            <div class="param-icon">🧠</div>
+            <div class="param-details">
+              <span class="param-name">Head Position</span>
+              <span class="param-value" id="pv-head">Centered</span>
+            </div>
+            <div class="param-sparkline-wrap">
+              <canvas class="param-sparkline" id="spark-head" width="80" height="30"></canvas>
+            </div>
+            <div class="param-status ok">OK</div>
+          </div>
+          <div class="param-card" id="param-phone">
+            <div class="param-icon">📱</div>
+            <div class="param-details">
+              <span class="param-name">Phone Usage</span>
+              <span class="param-value" id="pv-phone">Not Detected</span>
+            </div>
+            <div class="param-sparkline-wrap">
+              <canvas class="param-sparkline" id="spark-phone" width="80" height="30"></canvas>
+            </div>
+            <div class="param-status ok">OK</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== CAMERA SECTION ==================== -->
+    <section class="section" id="section-camera">
+      <div class="camera-layout">
+        <div class="camera-feed-card">
+          <div class="camera-feed-header">
+            <div class="camera-feed-title">
+              <span class="live-dot"></span>
+              Driver Monitoring Camera
+            </div>
+            <div class="camera-controls">
+              <button class="cam-btn" id="btn-ir">IR Mode</button>
+              <button class="cam-btn" id="btn-landmarks">Landmarks ON</button>
+              <button class="cam-btn active-cam-btn" id="btn-overlay">Overlay ON</button>
+            </div>
+          </div>
+          <div class="camera-viewport">
+            <div class="camera-scan-line" id="scan-line"></div>
+            <div class="camera-corner tl"></div>
+            <div class="camera-corner tr"></div>
+            <div class="camera-corner bl"></div>
+            <div class="camera-corner br"></div>
+
+            <!-- Face tracking overlay SVG -->
+            <svg class="face-overlay" id="face-overlay" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+              <!-- Face bounding box -->
+              <rect id="face-box" x="130" y="50" width="140" height="180" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="8 4" rx="4"/>
+              <!-- Eye tracking boxes -->
+              <rect id="left-eye-box" x="148" y="100" width="38" height="22" fill="none" stroke="#00ff88" stroke-width="1.2" rx="3"/>
+              <rect id="right-eye-box" x="214" y="100" width="38" height="22" fill="none" stroke="#00ff88" stroke-width="1.2" rx="3"/>
+              <!-- Pupil centers -->
+              <circle id="left-pupil" cx="167" cy="111" r="4" fill="none" stroke="#00ff88" stroke-width="1.2"/>
+              <circle id="right-pupil" cx="233" cy="111" r="4" fill="none" stroke="#00ff88" stroke-width="1.2"/>
+              <!-- Nose point -->
+              <circle cx="200" cy="155" r="2.5" fill="#f59e0b"/>
+              <!-- Mouth line -->
+              <path d="M175 175 Q200 185 225 175" fill="none" stroke="#f59e0b" stroke-width="1.2"/>
+              <!-- Head pose axes -->
+              <line id="pose-yaw" x1="200" y1="140" x2="230" y2="140" stroke="#ff6b6b" stroke-width="2" stroke-linecap="round"/>
+              <line id="pose-pitch" x1="200" y1="140" x2="200" y2="110" stroke="#00d4ff" stroke-width="2" stroke-linecap="round"/>
+              <!-- Labels -->
+              <text x="135" y="47" fill="#00d4ff" font-size="9" font-family="JetBrains Mono">FACE DETECTED</text>
+              <text x="148" y="96" fill="#00ff88" font-size="8" font-family="JetBrains Mono">LEFT EYE</text>
+              <text x="214" y="96" fill="#00ff88" font-size="8" font-family="JetBrains Mono">RIGHT EYE</text>
+              <text x="232" y="138" fill="#ff6b6b" font-size="8" font-family="JetBrains Mono">YAW</text>
+              <text x="203" y="108" fill="#00d4ff" font-size="8" font-family="JetBrains Mono">PITCH</text>
+            </svg>
+
+            <!-- Camera UI overlays -->
+            <div class="camera-hud-tl">
+              <div class="hud-line">EAR: <span class="hud-val" id="cam-ear">0.82</span></div>
+              <div class="hud-line">MAR: <span class="hud-val">0.14</span></div>
+              <div class="hud-line">YAW: <span class="hud-val" id="cam-yaw">+2.1°</span></div>
+              <div class="hud-line">PITCH: <span class="hud-val" id="cam-pitch">-1.3°</span></div>
+            </div>
+            <div class="camera-hud-tr">
+              <div class="hud-line">FPS: <span class="hud-val">30</span></div>
+              <div class="hud-line">CONF: <span class="hud-val">99.1%</span></div>
+              <div class="hud-line" id="cam-phone-status">PHONE: <span class="hud-val phone-ok">NONE</span></div>
+            </div>
+            <div class="camera-hud-bl">
+              <div class="drowsy-indicator" id="drowsy-indicator">
+                <span class="drowsy-dot"></span>
+                EYES OPEN
+              </div>
+            </div>
+            <div class="camera-hud-br">
+              <div class="hud-line">MODEL: <span class="hud-val">CNN v2.1</span></div>
+              <div class="hud-line">LATENCY: <span class="hud-val">12ms</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="camera-analytics">
+          <div class="analytics-card">
+            <h4>Eye Aspect Ratio (EAR)</h4>
+            <div class="ear-gauge-wrap">
+              <canvas id="ear-gauge" width="180" height="90"></canvas>
+              <div class="ear-value" id="ear-display">0.82</div>
+            </div>
+            <div class="ear-thresholds">
+              <span class="thr-label">Drowsy Threshold: 0.25</span>
+            </div>
+          </div>
+
+          <div class="analytics-card">
+            <h4>Head Pose Estimation</h4>
+            <div class="head-pose-viz" id="head-pose-viz">
+              <canvas id="head-pose-canvas" width="180" height="130"></canvas>
+            </div>
+          </div>
+
+          <div class="analytics-card">
+            <h4>Detection Log</h4>
+            <div class="detection-log" id="detection-log">
+              <div class="log-entry log-ok">✓ Face locked — confidence 99.1%</div>
+              <div class="log-entry log-ok">✓ Both eyes open — EAR 0.82</div>
+              <div class="log-entry log-ok">✓ Head centered — within ±15°</div>
+              <div class="log-entry log-ok">✓ No phone detected</div>
+              <div class="log-entry log-ok">✓ CNN inference: Normal</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SENSORS SECTION ==================== -->
+    <section class="section" id="section-sensors">
+      <div class="sensors-layout">
+        <div class="sensor-gauges-grid">
+          <div class="sensor-gauge-card">
+            <div class="sg-label">Speed</div>
+            <canvas id="g-speed" width="160" height="110"></canvas>
+            <div class="sg-value" id="gv-speed">72 km/h</div>
+            <div class="sg-bar-wrap"><div class="sg-bar" id="gb-speed" style="width:48%"></div></div>
+          </div>
+          <div class="sensor-gauge-card">
+            <div class="sg-label">Acceleration</div>
+            <canvas id="g-accel" width="160" height="110"></canvas>
+            <div class="sg-value" id="gv-accel">0.8 m/s²</div>
+            <div class="sg-bar-wrap"><div class="sg-bar" id="gb-accel" style="width:16%"></div></div>
+          </div>
+          <div class="sensor-gauge-card">
+            <div class="sg-label">Braking Force</div>
+            <canvas id="g-brake" width="160" height="110"></canvas>
+            <div class="sg-value" id="gv-brake">0.2 m/s²</div>
+            <div class="sg-bar-wrap"><div class="sg-bar" id="gb-brake" style="width:4%"></div></div>
+          </div>
+          <div class="sensor-gauge-card">
+            <div class="sg-label">Steering Angle</div>
+            <canvas id="g-steer" width="160" height="110"></canvas>
+            <div class="sg-value" id="gv-steer">8°</div>
+            <div class="sg-bar-wrap"><div class="sg-bar" id="gb-steer" style="width:22%"></div></div>
+          </div>
+          <div class="sensor-gauge-card">
+            <div class="sg-label">Lane Deviation</div>
+            <canvas id="g-lane" width="160" height="110"></canvas>
+            <div class="sg-value" id="gv-lane">0.12 m</div>
+            <div class="sg-bar-wrap"><div class="sg-bar" id="gb-lane" style="width:12%"></div></div>
+          </div>
+          <div class="sensor-gauge-card">
+            <div class="sg-label">Eye Closure (EAR)</div>
+            <canvas id="g-eye" width="160" height="110"></canvas>
+            <div class="sg-value" id="gv-eye">0.82</div>
+            <div class="sg-bar-wrap"><div class="sg-bar" id="gb-eye" style="width:82%"></div></div>
+          </div>
+        </div>
+
+        <div class="sensor-chart-card">
+          <div class="chart-card-header">
+            <div>
+              <h3>Multi-Parameter Radar</h3>
+              <p>Normalized sensor readings vs safe thresholds</p>
+            </div>
+          </div>
+          <canvas id="radar-chart" width="380" height="340"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== HISTORY SECTION ==================== -->
+    <section class="section" id="section-history">
+      <div class="history-layout">
+        <div class="history-chart-card">
+          <div class="chart-card-header">
+            <div>
+              <h3>Risk Score History</h3>
+              <p>Last 10 minutes driving session</p>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>Risk &gt;70</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Risk 30–70</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#10b981"></span>Risk &lt;30</span>
+            </div>
+          </div>
+          <canvas id="history-chart" width="700" height="220"></canvas>
+        </div>
+
+        <div class="events-table-card">
+          <div class="chart-card-header">
+            <div>
+              <h3>Incident Events</h3>
+              <p>Detected anomalies this session</p>
+            </div>
+            <span class="event-count-badge" id="event-count">7 Events</span>
+          </div>
+          <div class="events-table-wrap">
+            <table class="events-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Event</th>
+                  <th>Severity</th>
+                  <th>Duration</th>
+                  <th>Risk Δ</th>
+                </tr>
+              </thead>
+              <tbody id="events-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== AI MODEL SECTION ==================== -->
+    <section class="section" id="section-model">
+      <div class="model-layout">
+        <div class="model-arch-card">
+          <div class="chart-card-header">
+            <div>
+              <h3>Model Architecture</h3>
+              <p>CNN + LSTM Pipeline</p>
+            </div>
+            <span class="model-tag">Live Inference</span>
+          </div>
+          <div class="arch-diagram" id="arch-diagram">
+            <div class="arch-layer camera-layer">
+              <div class="layer-title">Input Sources</div>
+              <div class="layer-nodes">
+                <div class="arch-node">📷 Camera</div>
+                <div class="arch-node">🚗 IMU Sensor</div>
+                <div class="arch-node">🛣️ Lane Sensor</div>
+              </div>
+            </div>
+            <div class="arch-arrow">↓</div>
+            <div class="arch-layer cnn-layer">
+              <div class="layer-title">Feature Extraction (CNN)</div>
+              <div class="layer-nodes">
+                <div class="arch-node">Conv2D 32</div>
+                <div class="arch-node">Conv2D 64</div>
+                <div class="arch-node">MaxPool</div>
+                <div class="arch-node">Flatten</div>
+              </div>
+              <div class="layer-meta">
+                <span>Spatial Features</span>
+                <span>Facial Landmarks</span>
+              </div>
+            </div>
+            <div class="arch-arrow">↓</div>
+            <div class="arch-layer lstm-layer">
+              <div class="layer-title">Temporal Analysis (LSTM)</div>
+              <div class="layer-nodes">
+                <div class="arch-node">LSTM 128</div>
+                <div class="arch-node">LSTM 64</div>
+                <div class="arch-node">Dropout 0.3</div>
+              </div>
+              <div class="layer-meta">
+                <span>Sequence Length: 30 frames</span>
+                <span>Hidden State: 128</span>
+              </div>
+            </div>
+            <div class="arch-arrow">↓</div>
+            <div class="arch-layer output-layer">
+              <div class="layer-title">Classification Output</div>
+              <div class="layer-nodes">
+                <div class="arch-node class-normal">Normal</div>
+                <div class="arch-node class-aggr">Aggressive</div>
+                <div class="arch-node class-dist">Distracted</div>
+                <div class="arch-node class-drowsy">Drowsy</div>
+                <div class="arch-node class-brake">Unsafe Braking</div>
+                <div class="arch-node class-accel">Unsafe Accel.</div>
+              </div>
+            </div>
+            <div class="arch-arrow">↓</div>
+            <div class="arch-layer risk-layer">
+              <div class="layer-title">Risk Score Output</div>
+              <div class="layer-nodes">
+                <div class="arch-node risk-node">🎯 Risk Score 0–100</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="model-stats-column">
+          <div class="model-stat-card">
+            <h4>Model Performance</h4>
+            <div class="perf-metrics">
+              <div class="perf-metric">
+                <span class="pm-label">Overall Accuracy</span>
+                <div class="pm-bar-wrap"><div class="pm-bar" style="width:94.2%"></div></div>
+                <span class="pm-val">94.2%</span>
+              </div>
+              <div class="perf-metric">
+                <span class="pm-label">Drowsy Detection</span>
+                <div class="pm-bar-wrap"><div class="pm-bar pm-bar-yellow" style="width:91.5%"></div></div>
+                <span class="pm-val">91.5%</span>
+              </div>
+              <div class="perf-metric">
+                <span class="pm-label">Aggressive Driving</span>
+                <div class="pm-bar-wrap"><div class="pm-bar pm-bar-orange" style="width:96.1%"></div></div>
+                <span class="pm-val">96.1%</span>
+              </div>
+              <div class="perf-metric">
+                <span class="pm-label">Distracted Driving</span>
+                <div class="pm-bar-wrap"><div class="pm-bar pm-bar-red" style="width:89.3%"></div></div>
+                <span class="pm-val">89.3%</span>
+              </div>
+              <div class="perf-metric">
+                <span class="pm-label">Phone Detection</span>
+                <div class="pm-bar-wrap"><div class="pm-bar" style="width:97.8%"></div></div>
+                <span class="pm-val">97.8%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="model-stat-card">
+            <h4>Confusion Matrix</h4>
+            <div class="confusion-matrix" id="confusion-matrix"></div>
+          </div>
+
+          <div class="model-stat-card">
+            <h4>Inference Stats</h4>
+            <div class="inference-stats">
+              <div class="inf-stat"><span class="inf-key">Framework</span><span class="inf-val">TensorFlow 2.x</span></div>
+              <div class="inf-stat"><span class="inf-key">Inference Lat.</span><span class="inf-val">12 ms</span></div>
+              <div class="inf-stat"><span class="inf-key">FPS (Camera)</span><span class="inf-val">30 FPS</span></div>
+              <div class="inf-stat"><span class="inf-key">Model Params</span><span class="inf-val">2.4M</span></div>
+              <div class="inf-stat"><span class="inf-key">Training Data</span><span class="inf-val">48,000 samples</span></div>
+              <div class="inf-stat"><span class="inf-key">Sequence Len</span><span class="inf-val">30 frames</span></div>
+              <div class="inf-stat"><span class="inf-key">Epochs</span><span class="inf-val">120</span></div>
+              <div class="inf-stat"><span class="inf-key">Optimizer</span><span class="inf-val">Adam (lr=1e-4)</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ALERTS SECTION ==================== -->
+    <section class="section" id="section-alerts">
+      <div class="alerts-layout">
+        <div class="alerts-feed-card">
+          <div class="chart-card-header">
+            <div>
+              <h3>Alert Feed</h3>
+              <p>Real-time system notifications</p>
+            </div>
+            <button class="clear-btn" id="clear-alerts-btn">Clear All</button>
+          </div>
+          <div class="alerts-feed" id="alerts-feed">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <div class="alert-settings-card">
+          <div class="chart-card-header">
+            <div><h3>Alert Thresholds</h3><p>Configure detection sensitivity</p></div>
+          </div>
+          <div class="threshold-settings">
+            <div class="threshold-item">
+              <label>Drowsiness EAR Threshold</label>
+              <div class="slider-row">
+                <input type="range" min="15" max="40" value="25" class="thresh-slider" id="thr-ear"/>
+                <span class="slider-val" id="thr-ear-val">0.25</span>
+              </div>
+            </div>
+            <div class="threshold-item">
+              <label>Max Speed Alert (km/h)</label>
+              <div class="slider-row">
+                <input type="range" min="60" max="180" value="120" class="thresh-slider" id="thr-speed"/>
+                <span class="slider-val" id="thr-speed-val">120 km/h</span>
+              </div>
+            </div>
+            <div class="threshold-item">
+              <label>Max Acceleration (m/s²)</label>
+              <div class="slider-row">
+                <input type="range" min="30" max="100" value="50" class="thresh-slider" id="thr-accel"/>
+                <span class="slider-val" id="thr-accel-val">5.0 m/s²</span>
+              </div>
+            </div>
+            <div class="threshold-item">
+              <label>Lane Deviation Alert (m)</label>
+              <div class="slider-row">
+                <input type="range" min="10" max="80" value="30" class="thresh-slider" id="thr-lane"/>
+                <span class="slider-val" id="thr-lane-val">0.30 m</span>
+              </div>
+            </div>
+            <div class="threshold-item">
+              <label>Risk Score Alert Level</label>
+              <div class="slider-row">
+                <input type="range" min="30" max="90" value="60" class="thresh-slider" id="thr-risk"/>
+                <span class="slider-val" id="thr-risk-val">60</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert-toggles">
+            <h4>Alert Channels</h4>
+            <div class="toggle-item">
+              <span>Visual Alert (Dashboard)</span>
+              <label class="toggle-switch"><input type="checkbox" checked id="tog-visual"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-item">
+              <span>Audio Warning</span>
+              <label class="toggle-switch"><input type="checkbox" checked id="tog-audio"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-item">
+              <span>Haptic Feedback (Seat)</span>
+              <label class="toggle-switch"><input type="checkbox" id="tog-haptic"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-item">
+              <span>Emergency Contact SMS</span>
+              <label class="toggle-switch"><input type="checkbox" id="tog-sms"><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Alert Toast Popup -->
+  <div class="alert-toast" id="alert-toast">
+    <div class="toast-icon">⚠️</div>
+    <div class="toast-content">
+      <div class="toast-title" id="toast-title">Drowsiness Detected</div>
+      <div class="toast-msg" id="toast-msg">Eye closure ratio below threshold</div>
+    </div>
+    <button class="toast-close" id="toast-close">✕</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
